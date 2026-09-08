@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "cryptocrack"
+version = "1.0.0"
+description = "Crypto attacks + credential cracking suite for authorized security testing"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "5h4d0wn1k", email = "5h4d0wn1k@users.noreply.github.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security :: Cryptography",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+cryptocrack = "cryptocrack.cli:main"
+
+[project.entry-points.console_scripts]
+cryptocrack = "cryptocrack.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["cryptocrack*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
