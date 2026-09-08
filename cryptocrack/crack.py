@@ -7,12 +7,11 @@ Supports:
 - MD5-crypt / SHA-256-crypt / SHA-512-crypt verification
 - Performance stats
 """
-import hashlib
 import time
 import string
 from itertools import product as iter_product
 
-from .primitives import md5, sha1, sha256, md4, md5_crypt, sha256_crypt, sha512_crypt
+from .primitives import md5, sha1, sha256, sha512, md4, md5_crypt, sha256_crypt, sha512_crypt
 
 
 # ---------------------------------------------------------------------------
@@ -30,37 +29,38 @@ def _hash_func(algo: str):
         "md5": lambda p: md5(p.encode()),
         "sha1": lambda p: sha1(p.encode()),
         "sha256": lambda p: sha256(p.encode()),
-        "sha512": lambda p: hashlib.sha512(p.encode()).digest(),
+        "sha512": lambda p: sha512(p.encode()),
+        "md4": lambda p: md4(p.encode()),
         "ntlm": _ntlm_hash,
-        "md5crypt": None,
-        "sha256crypt": None,
-        "sha512crypt": None,
     }
     return mapping.get(algo.lower())
+
+
+def _parse_crypt_config(hash_str: str) -> tuple[int, str]:
+    """Return (rounds, salt) for a $5$/$6$ crypt hash, handling rounds=."""
+    parts = hash_str.split("$")
+    # $5$[rounds=N$]salt$checksum  ->  ['', '5', 'rounds=N', 'salt', 'checksum']
+    if len(parts) >= 4 and parts[2].startswith("rounds="):
+        rounds = int(parts[2][len("rounds="):])
+        salt = parts[3]
+    else:
+        rounds = 5000
+        salt = parts[2]
+    return rounds, salt
 
 
 def _verify_crypt_hash(password: str, hash_str: str) -> bool:
     """Verify a password against a unix crypt-style hash."""
     if hash_str.startswith("$1$"):
-        return md5_crypt(password, _extract_salt(hash_str, "$1$", "$", 2)) == hash_str
+        salt = hash_str.split("$")[2]
+        return md5_crypt(password, salt) == hash_str
     if hash_str.startswith("$5$"):
-        parts = hash_str.split("$")
-        salt = parts[3]
-        expected = sha256_crypt(password, salt)
-        return expected == hash_str
+        rounds, salt = _parse_crypt_config(hash_str)
+        return sha256_crypt(password, salt, rounds) == hash_str
     if hash_str.startswith("$6$"):
-        parts = hash_str.split("$")
-        salt = parts[3]
-        expected = sha512_crypt(password, salt)
-        return expected == hash_str
+        rounds, salt = _parse_crypt_config(hash_str)
+        return sha512_crypt(password, salt, rounds) == hash_str
     return False
-
-
-def _extract_salt(hash_str: str, start_marker: str, end_marker: str, start_idx: int = 0) -> str:
-    parts = hash_str.split("$")
-    if len(parts) > 2:
-        return parts[2]
-    return ""
 
 
 # ---------------------------------------------------------------------------

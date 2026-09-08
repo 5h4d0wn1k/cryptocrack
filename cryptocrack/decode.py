@@ -1,6 +1,47 @@
 """Automated cipher detection and decoding."""
-import string
+import base64
+import re
 from collections import Counter
+from urllib.parse import unquote
+
+_ENGLISH_FREQ = {
+    " ": 0.13, "e": 0.127, "t": 0.091, "a": 0.082, "o": 0.075,
+    "i": 0.070, "n": 0.067, "s": 0.063, "h": 0.061, "r": 0.060,
+    "d": 0.043, "l": 0.040, "u": 0.028, "c": 0.028, "m": 0.024,
+}
+
+_ENGLISH_BIGRAMS = {
+    'th': 2.71, 'he': 2.33, 'in': 2.03, 'er': 1.78, 'an': 1.61,
+    're': 1.41, 'on': 1.41, 'at': 1.35, 'en': 1.31, 'nd': 1.18,
+    'ti': 1.15, 'es': 1.11, 'or': 1.08, 'te': 1.05, 'of': 1.04,
+    'ed': 1.00, 'is': 0.97, 'it': 0.96, 'al': 0.93, 'ar': 0.92,
+    'st': 0.89, 'nt': 0.89, 'to': 0.86, 'ng': 0.84, 'se': 0.83,
+    'ha': 0.80, 'le': 0.77, 've': 0.75, 'ou': 0.74, 'as': 0.72,
+    'de': 0.71, 'ra': 0.69, 'ro': 0.69, 'ri': 0.68, 'li': 0.68,
+    'la': 0.67, 'wh': 0.67, 'ta': 0.66,
+}
+
+
+def _english_score(text: str) -> float:
+    """Score text by English unigram + bigram frequencies.
+
+    Bigrams with space/space-weighting handle short messages where
+    unigram analysis alone cannot disambiguate a Caesar shift.
+    """
+    if not text:
+        return 0.0
+    score = 0.0
+    bad = 0
+    for i in range(len(text) - 1):
+        score += _ENGLISH_BIGRAMS.get(text[i:i + 2].lower(), 0.0)
+    score += text.count(" ") * 3.0
+    for ch in text:
+        o = ord(ch)
+        if o < 32 and ch not in "\n\t\r":
+            bad += 1
+        else:
+            score += 0.4 * _ENGLISH_FREQ.get(ch.lower(), 0.0)
+    return score - bad * 5.0
 
 def caesar_bruteforce(ciphertext):
     results = []
@@ -9,12 +50,11 @@ def caesar_bruteforce(ciphertext):
         for ch in ciphertext:
             if ch.isalpha():
                 base = ord('A') if ch.isupper() else ord('a')
-                decoded += chr((ord(ch) - base + shift) % 26 + base)
+                decoded += chr((ord(ch) - base - shift) % 26 + base)
             else:
                 decoded += ch
-        score = sum(1 for c in decoded if c in ' ETAOINSHRDLCUMWFGYPBVKJXQZ')
-        results.append((shift, decoded, score))
-    return results
+        results.append((shift, decoded, _english_score(decoded)))
+    return sorted(results, key=lambda x: -x[2])
 
 def vigenere_decrypt(ciphertext, key):
     result = []
@@ -29,21 +69,17 @@ def vigenere_decrypt(ciphertext, key):
             result.append(ch)
     return "".join(result)
 
-def xor_single_byte(data):
+def xor_single_byte(data: bytes):
+    """Crack a single-byte XOR by English frequency scoring."""
     best = (0, "", 0.0)
-    freq_expected = {' ': 0.15, 'e': 0.13, 't': 0.09, 'a': 0.08, 'o': 0.075, 'n': 0.07, 'i': 0.065, 's': 0.06}
     for key in range(256):
         decrypted = bytes([b ^ key for b in data])
-        text = decrypted.decode('latin-1')
-        printable_ratio = sum(1 for c in text if c in string.printable) / max(len(text), 1)
-        score = 0
-        freq = Counter(c.lower() for c in text if c.isalpha())
-        total = sum(freq.values()) or 1
-        for ch, exp in freq_expected.items():
-            score += min(freq.get(ch, 0) / total, exp * 2)
-        final = score * printable_ratio
-        if final > best[2]:
-            best = (key, text, final)
+        text = decrypted.decode("latin-1")
+        if any(ord(c) < 32 and c not in "\n\t\r" for c in text):
+            continue
+        score = _english_score(text)
+        if score > best[2]:
+            best = (key, text, score)
     return best
 
 def xor_repeating_key(data, key):
