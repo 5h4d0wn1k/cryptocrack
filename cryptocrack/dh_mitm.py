@@ -25,14 +25,23 @@ def is_safe_prime(p):
     return p % 2 == 1 and _is_prime_miller_rabin(p) and _is_prime_miller_rabin(q)
 
 def validate_generator(g, p):
+    """Classify a generator for a safe prime p = 2q + 1.
+
+    Returns the actual order class: 'full' (order p-1) or 'prime-subgroup'
+    (order q). RFC 3526 group 14 uses g=5 in the prime-order subgroup,
+    which is the standard cryptographic choice; full-order generators
+    are only needed for schemes that must not hide in a subgroup.
+    """
     if g < 2 or g >= p:
         return {"valid": False, "reason": "g out of range"}
     q = (p - 1) // 2
-    if pow(g, q, p) == 1:
-        return {"valid": False, "reason": "g is quadratic residue"}
     if pow(g, 2, p) == 1:
-        return {"valid": False, "reason": "g == 1 mod p"}
-    return {"valid": True, "reason": "g is a valid generator"}
+        return {"valid": False, "reason": "g has order 2 (only ±1 usable); not a generator"}
+    if pow(g, q, p) == 1:
+        return {"valid": True, "order": q, "class": "prime-subgroup",
+                "reason": "g generates the order-q subgroup (RFC 3526 style)"}
+    return {"valid": True, "order": p - 1, "class": "full",
+            "reason": "g generates the full group of order p-1"}
 
 def _derive_key(shared_secret):
     return sha256(str(shared_secret).encode())
