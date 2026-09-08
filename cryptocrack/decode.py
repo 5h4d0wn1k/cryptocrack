@@ -22,11 +22,24 @@ _ENGLISH_BIGRAMS = {
 }
 
 
+_COMMON_WORDS = (
+    " alone ", " also ", " been ", " done ", " first ", " from ", " good ",
+    " have ", " hello ", " home ", " know ", " last ", " like ", " many ",
+    " more ", " most ", " near ", " night", " people ", " right ", " some ",
+    " that ", " them ", " then ", " there ", " these ", " thing ", " this ",
+    " time ", " well ", " were ", " what ", " when ", " where ", " which ",
+    " will ", " with ", " word ", " would ", " world ", " years ", " your ",
+    " the ", " and ", " for ", " you ", " not ", " are ",
+)
+
+
 def _english_score(text: str) -> float:
     """Score text by English unigram + bigram frequencies.
 
     Bigrams with space/space-weighting handle short messages where
-    unigram analysis alone cannot disambiguate a Caesar shift.
+    unigram analysis alone cannot disambiguate a Caesar shift. A small
+    embedded common-word list adds a strong n-gram prior on short demos
+    without shipping external dictionaries.
     """
     if not text:
         return 0.0
@@ -41,6 +54,10 @@ def _english_score(text: str) -> float:
             bad += 1
         else:
             score += 0.4 * _ENGLISH_FREQ.get(ch.lower(), 0.0)
+    padded = " " + text.lower() + " "
+    for word in _COMMON_WORDS:
+        if word in padded:
+            score += 2.0
     return score - bad * 5.0
 
 def caesar_bruteforce(ciphertext):
