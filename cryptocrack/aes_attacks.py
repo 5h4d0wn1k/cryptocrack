@@ -261,22 +261,27 @@ class PaddingOracle:
     def _serve(self):
         self.server.settimeout(5)
         try:
-            conn, _ = self.server.accept()
-            data = conn.recv(65536)
-            if len(data) < 16:
-                conn.send(b"0")
-                conn.close()
-                return
-            iv = data[:16]
-            ct = data[16:]
-            try:
-                decrypted = cbc_decrypt(ct, self.key, iv)
-                valid = pkcs7_valid(decrypted)
-                conn.send(b"1" if valid else b"0")
-            except Exception:
-                conn.send(b"0")
-            conn.close()
-        except socket.timeout:
+            while True:
+                try:
+                    conn, _ = self.server.accept()
+                except socket.timeout:
+                    return
+                except OSError:
+                    return
+                with conn:
+                    data = conn.recv(65536)
+                    if len(data) < 16:
+                        conn.send(b"0")
+                        continue
+                    iv = data[:16]
+                    ct = data[16:]
+                    try:
+                        decrypted = cbc_decrypt(ct, self.key, iv)
+                        valid = pkcs7_valid(decrypted)
+                        conn.send(b"1" if valid else b"0")
+                    except Exception:
+                        conn.send(b"0")
+        except OSError:
             pass
 
     def oracle(self, iv: bytes, ct: bytes) -> bool:
@@ -295,7 +300,10 @@ class PaddingOracle:
 
     def stop(self):
         if self.server:
-            self.server.close()
+            try:
+                self.server.close()
+            except OSError:
+                pass
 
     def encrypt(self, plaintext: bytes) -> tuple[bytes, bytes]:
         return cbc_encrypt(plaintext, self.key)
