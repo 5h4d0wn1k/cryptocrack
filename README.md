@@ -1,4 +1,5 @@
 # cryptocrack
+![tests](https://github.com/5h4d0wn1k/cryptocrack/actions/workflows/ci.yml/badge.svg) ![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
 Crypto attacks + credential cracking - hash identify+crack, rules, RSA/AES/DH attacks, cipher auto-decode, XTS-CPA
 
@@ -101,3 +102,6 @@ Measured on the live demo and test suite (see METRICS.md for the full table):
   passlib 1.7.4: md4, md5, sha1/256/512, md5-crypt, sha256/512-crypt, AES-128/192/256.
 - Full `demo` exits 0 with all stages proved (padding-oracle plaintext recovery,
   XTS CPA key recovery ~0.7 average correlation, Wiener d=9, etc.).
+
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md).
